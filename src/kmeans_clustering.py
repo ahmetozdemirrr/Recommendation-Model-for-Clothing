@@ -32,17 +32,30 @@ def prepare_kmeans_data(data_path):
     numeric_cols = ["Age", "Previous Purchases"]
 
 # *******************************************************************
+# TO DO:
+#
+# *******************************************************************
+#
 # önem sırası ata... (kullanacağımız sütunların önemleri farklı olsun ...weighted...)
+#
 # *******************************************************************
-# oneHotEncoder ayarla... (tüm sütunlara ohe uygulamaya gerek olmayabilir, bazılarına kendimiz değer atayabiliriz)
+#
+# oneHotEncoder ayarla... (tüm sütunlara ohe uygulamaya gerek olmayabilir, 
+# bazılarına kendimiz değer atayabiliriz)
+#
 # *******************************************************************
+#
 # accuracy ölç...
+#
 # *******************************************************************
+#
 # k-means: iki model üstünde çalışsın
 #   1 - kullanıcı benzerliği üzerine kümeleme yapsın
 #   2 - kullanıcının aldığı ürüne benzer ürünleri kümeleme yapsın
 # ardından cosine_similarity ile en yüksek puanlı ürünleri listele
 # dataseti kullanıcı ve ürün bazlı olarak ikiye ayıralım
+# bu ayrılan setleri accuracy ölçmek için kullanabiliriz... üzerine düşün.
+#
 # *******************************************************************
 
     # Kategorik sütunlar için One-Hot Encoding
