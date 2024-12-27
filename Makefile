@@ -1,7 +1,7 @@
-# Proje adını tanımla
-PROJECT_NAME = DefactoRecommendation
+# Proje adı
+PROJECT_NAME = Recommendation-Model
 
-# Python komutu (sanallaştırılmış ortam kullanıyorsanız venv yolunu ekleyin)
+# Python interpreter
 PYTHON = python3
 
 # Gereksinim dosyası
