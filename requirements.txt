@@ -2,3 +2,5 @@ numpy==1.25.0
 scipy
 scikit-learn
 pandas
+kneed>=0.8.5
+matplotlib>=3.7.0

@@ -1,75 +1,84 @@
-# Proje adı
-PROJECT_NAME = Recommendation-Model
+# Makefile
 
 # Python interpreter
 PYTHON = python3
 
-# Gereksinim dosyası
-REQUIREMENTS = requirements.txt
-
-# Ana dizinler
+# Proje dizinleri
 SRC_DIR = src
 DATA_DIR = data
-TESTS_DIR = tests
+
+# Varsayılan değerler
+USER_ID = 1
+NUM_RECOMMENDATIONS = 3
+
 
 # Hedefler
+.PHONY: setup clean user item cluster evaluate help
 
-# Ortamı hazırlama (kütüphaneleri yükler)
-.PHONY: setup
+
+# Ortamı hazırlama
 setup:
 	@echo "-> Gerekli bağımlılıklar yükleniyor..."
-	$(PYTHON) -m pip install -r $(REQUIREMENTS)
+	$(PYTHON) -m pip install -r requirements.txt
 
 
-# Testleri çalıştırır
-.PHONY: test
-test:
-	@echo "-> Testler çalıştırılıyor..."
-	$(PYTHON) -m unittest discover $(TESTS_DIR)
+# Kullanıcı bazlı öneri
+user:
+	@echo "-> Kullanıcı bazlı öneriler oluşturuluyor..."
+	$(PYTHON) $(SRC_DIR)/main.py \
+		--mode user \
+		--user_id $(USER_ID) \
+		--num_recommendations $(NUM_RECOMMENDATIONS)
 
 
-# User-Based Collaborative Filtering modelini çalıştır
-.PHONY: user-based
-user-based:
-	@echo "-> User-Based Collaborative Filtering modeli çalıştırılıyor..."
-	$(PYTHON) src/user_based.py --user_id=$(USER_ID) --num_recommendations=$(NUM_RECOMMENDATIONS)
+# Ürün bazlı öneri
+item:
+	@echo "-> Ürün bazlı öneriler oluşturuluyor..."
+	$(PYTHON) $(SRC_DIR)/main.py \
+		--mode item \
+		--user_id $(USER_ID) \
+		--num_recommendations $(NUM_RECOMMENDATIONS)
 
 
-# Content-Based Filtering modelini çalıştır
-.PHONY: content-based
-content-based:
-	@echo "-> Content-Based Filtering modeli çalıştırılıyor..."
-	$(PYTHON) src/content_based.py --user_id=$(USER_ID) --top_n=$(TOP_N)
+# Küme bazlı öneri
+cluster:
+	@echo "-> Küme bazlı öneriler oluşturuluyor..."
+	$(PYTHON) $(SRC_DIR)/main.py \
+		--mode cluster \
+		--user_id $(USER_ID) \
+		--num_recommendations $(NUM_RECOMMENDATIONS)
 
 
-# K-Means Clustering modelini çalıştır
-.PHONY: kmeans
-kmeans:
-	@echo "-> K-Means Clustering modeli çalıştırılıyor..."
-	$(PYTHON) src/kmeans_clustering.py --user_id=$(USER_ID) --top_n=$(TOP_N)
+evaluate:
+	@echo "-> Öneri sistemleri değerlendiriliyor..."
+	$(PYTHON) $(SRC_DIR)/main.py --evaluate --n_test_users $(N_TEST_USERS)
 
 
-# Kümeleri kaydet
-.PHONY: save-clusters
-save-clusters:
-	@echo "-> Kümeler kaydediliyor..."
-	$(PYTHON) src/kmeans_clustering.py --save-clusters
-
-
-
-# Temizlik işlemleri (örneğin, geçici dosyaları siler)
-.PHONY: clean
+# Temizlik
 clean:
 	@echo "-> Geçici dosyalar temizleniyor..."
-	rm -rf __pycache__ */__pycache__
-	rm -rf cluster_assignments.csv
+	find . -type d -name "__pycache__" -exec rm -r {} +
+	find . -type f -name "*.pyc" -delete
+	find . -type f -name "*.pyo" -delete
+	find . -type f -name "*.pyd" -delete
 
 
 # Yardım mesajı
-.PHONY: help
 help:
 	@echo "Kullanılabilir komutlar:"
-	@echo "  make setup    - Ortamı hazırlamak için gerekli bağımlılıkları yükler"
-	@echo "  make test     - Testleri çalıştırır"
-	@echo "  make run      - Öneri modelini çalıştırır"
-	@echo "  make clean    - Geçici dosyaları temizler"
+	@echo "  make setup                               - Gerekli bağımlılıkları yükler"
+	@echo "  make user USER_ID=123                    - Kullanıcı bazlı öneriler oluşturur"
+	@echo "  make item USER_ID=123                    - Ürün bazlı öneriler oluşturur"
+	@echo "  make cluster USER_ID=123                 - Küme bazlı öneriler oluşturur"
+	@echo "  make clean                               - Geçici dosyaları temizler"
+	@echo "  make evaluate N_TEST_USERS=100           - Öneri sistemlerini değerlendirir"
+	@echo ""
+	@echo "Örnekler:"
+	@echo "  make user USER_ID=123"
+	@echo "  make user USER_ID=123 NUM_RECOMMENDATIONS=10"
+	@echo "  make item USER_ID=123"
+	@echo "  make cluster USER_ID=123"
+
+
+# Varsayılan hedef
+.DEFAULT_GOAL := help
