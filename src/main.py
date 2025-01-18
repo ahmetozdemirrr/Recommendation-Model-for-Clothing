@@ -2,12 +2,12 @@
 
 import argparse
 import sys
-from data_preprocessing import split_dataset
-from recommender_models import UserBasedRecommender, ItemBasedRecommender
-from clustering import ClusteringRecommender
-from utils import RecommendationFormatter
-from evaluation import evaluate_recommenders
-
+from models.collaborative_user.user_recommender import UserBasedRecommender
+from models.collaborative_item.item_recommender import ItemBasedRecommender
+from models.kmeans_hybrid.cluster_recommender import ClusteringRecommender
+from common.utils import RecommendationFormatter
+from common.evaluation import evaluate_recommenders
+from common.data_preprocessing import split_dataset
 
 def print_cluster_insights(insights):
     """Kümeleme analizi sonuçlarını formatlar ve ekrana basar"""

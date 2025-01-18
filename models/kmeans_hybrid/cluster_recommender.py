@@ -1,12 +1,13 @@
-# clustering.py
+# cluster_recommender.py
 
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans 
 from sklearn.preprocessing import StandardScaler
-from data_preprocessing import encode_features
+from sklearn.metrics.pairwise import cosine_similarity
 from kneed import KneeLocator
-
+from common.data_preprocessing import encode_features
+from common import MIN_SIMILARITY_THRESHOLD
 
 class ClusteringRecommender:
 
@@ -26,7 +27,6 @@ class ClusteringRecommender:
             curve='convex', 
             direction='decreasing'
         )
-        
         optimal_k = kneedle.knee
         return optimal_k if optimal_k else 3
 
@@ -52,9 +52,18 @@ class ClusteringRecommender:
             'Season'
         ]
         
+        # Benzerlik hesaplama için kullanılacak özellikler
+        similarity_features = [
+            'Item Purchased',
+            'Category',
+            'Color',
+            'Season'
+        ]
+        
         # Seçilen özellikleri kullanarak kümeleme için veri hazırla
         self.encoded_users = encode_features(self.user_df[user_features])
         self.encoded_items = encode_features(self.item_df[item_features])
+        self.encoded_similarity = encode_features(self.item_df[similarity_features])
         
         # Optimal k değerlerini bul
         self.n_user_clusters = self.find_optimal_k(self.encoded_users)
@@ -76,91 +85,101 @@ class ClusteringRecommender:
         self.item_df['Cluster'] = self.item_clusters
 
 
+    def calculate_similarity_score(self, idx1, idx2, user_cluster):
+        """
+        İki ürün arasındaki benzerlik skorunu hesaplar.
+        
+        Parametreler:
+        idx1: Birinci ürünün indeksi
+        idx2: İkinci ürünün indeksi
+        user_cluster: Hedef kullanıcının kümesi
+        
+        Dönüş:
+        float: 0-1 arası benzerlik skoru
+        """
+        # Ürünleri al
+        item1 = self.item_df.iloc[idx1]
+        item2 = self.item_df.iloc[idx2]
+        
+        # Base similarity - encoded özellikler üzerinden cosine similarity
+        base_similarity = cosine_similarity(
+            self.encoded_similarity[idx1].reshape(1, -1),
+            self.encoded_similarity[idx2].reshape(1, -1)
+        )[0][0]
+        
+        # Ağırlıklar
+        weights = {
+            'cluster': 0.31,      # Ürün kümesi benzerliği
+            'category': 0.25,     # Kategori benzerliği
+            'season': 0.15,       # Sezon benzerliği
+            'user_cluster': 0.19, # Kullanıcı kümesi benzerliği
+            'price': 0.05,        # Fiyat benzerliği
+            'color': 0.05         # Renk benzerliği
+        }
+        
+        # Her faktör için benzerlik hesapla (0-1 arası)
+        similarities = {
+            'cluster': 1.0 if item1['Cluster'] == item2['Cluster'] else 0.0,
+            'category': 1.0 if item1['Category'] == item2['Category'] else 0.0,
+            'season': 1.0 if item1['Season'] == item2['Season'] else 0.0,
+            'user_cluster': 1.0 if self.user_df[self.user_df['Customer ID'] == item1['Customer ID']].iloc[0]['Cluster'] == user_cluster else 0.0,
+            'price': max(0, 1 - abs(item1['Purchase Amount (USD)'] - item2['Purchase Amount (USD)']) / max(item2['Purchase Amount (USD)'], 1)),
+            'color': 1.0 if item1['Color'] == item2['Color'] else 0.0
+        }
+        
+        # Ağırlıklı toplam faktör benzerliği
+        factor_similarity = sum(weights[k] * similarities[k] for k in weights)
+        
+        # Final benzerlik skoru
+        final_similarity = base_similarity * factor_similarity
+        
+        return final_similarity
+
+
     def get_cluster_recommendations(self, user_id, n_recommendations=5):
         try:
             print(f"\nKullanıcı ID: {user_id} için öneriler hazırlanıyor...")
             
-            # Kullanıcının ve ürününün kümelerini bul
+            # Kullanıcının ve ürününün bilgilerini al
             user_idx = self.user_df[self.user_df['Customer ID'] == user_id].index[0]
             user_cluster = self.user_clusters[user_idx]
             user_info = self.user_df.iloc[user_idx]
-            print(f"Kullanıcı kümesi: {user_cluster}")
             
-            user_item = self.item_df[self.item_df['Customer ID'] == user_id].iloc[0]
-            item_cluster = user_item['Cluster']
-            print(f"Kullanıcının ürün kümesi: {item_cluster}")
+            # Kullanıcının mevcut ürününü bul
+            user_item_idx = self.item_df[self.item_df['Customer ID'] == user_id].index[0]
+            user_item = self.item_df.iloc[user_item_idx]
+            
+            print(f"Kullanıcı kümesi: {user_cluster}")
+            print(f"Kullanıcının ürün kümesi: {user_item['Cluster']}")
             print(f"Kullanıcının mevcut ürünü: {user_item['Item Purchased']}")
             
             # Tüm ürünleri değerlendir (kendisi hariç)
-            recommendations = self.item_df[self.item_df['Customer ID'] != user_id].copy()
-            print(f"Toplam değerlendirilecek ürün sayısı: {len(recommendations)}")
+            other_items = self.item_df[self.item_df['Customer ID'] != user_id].copy()
+            print(f"Toplam değerlendirilecek ürün sayısı: {len(other_items)}")
             
-            # Benzerlik skoru hesaplama
-            # Benzerlik bileşenleri ve ağırlıkları
-            cluster_weight = 0.4  # Ürün kümesi benzerliği
-            category_weight = 0.2  # Kategori benzerliği
-            season_weight = 0.15   # Sezon benzerliği
-            user_cluster_weight = 0.15  # Kullanıcı kümesi benzerliği
-            price_weight = 0.05    # Fiyat benzerliği
-            color_weight = 0.05    # Renk benzerliği
-
-            # Başlangıç benzerlik skoru
-            recommendations['Similarity'] = 0.0
-
-            # 1. Ürün kümesi benzerliği (0.4)
-            matching_cluster = recommendations['Cluster'] == item_cluster
-            recommendations.loc[matching_cluster, 'Similarity'] += cluster_weight
-            print(f"Aynı ürün kümesinde olan ürün sayısı: {matching_cluster.sum()}")
-
-            # 2. Kategori benzerliği (0.2)
-            matching_category = recommendations['Category'] == user_item['Category']
-            recommendations.loc[matching_category, 'Similarity'] += category_weight
-            print(f"Aynı kategoride olan ürün sayısı: {matching_category.sum()}")
-
-            # 3. Sezon benzerliği (0.15)
-            matching_season = recommendations['Season'] == user_item['Season']
-            recommendations.loc[matching_season, 'Similarity'] += season_weight
-            print(f"Aynı sezonda olan ürün sayısı: {matching_season.sum()}")
-
-            # 4. Kullanıcı kümesi benzerliği (0.15)
-            recommendations['User_Cluster'] = recommendations['Customer ID'].map(
-                self.user_df.set_index('Customer ID')['Cluster'])
-            matching_user_cluster = recommendations['User_Cluster'] == user_cluster
-            recommendations.loc[matching_user_cluster, 'Similarity'] += user_cluster_weight
-            print(f"Aynı kullanıcı kümesindeki kullanıcılardan ürün sayısı: {matching_user_cluster.sum()}")
-
-            # 5. Fiyat aralığı benzerliği (0.05)
-            price_range = 0.2 * user_item['Purchase Amount (USD)']
-            price_mask = (
-                (recommendations['Purchase Amount (USD)'] >= user_item['Purchase Amount (USD)'] - price_range) & 
-                (recommendations['Purchase Amount (USD)'] <= user_item['Purchase Amount (USD)'] + price_range)
-            )
-            recommendations.loc[price_mask, 'Similarity'] += price_weight
-            print(f"Benzer fiyat aralığında olan ürün sayısı: {price_mask.sum()}")
-
-            # 6. Renk benzerliği (0.05)
-            matching_color = recommendations['Color'] == user_item['Color']
-            recommendations.loc[matching_color, 'Similarity'] += color_weight
-            print(f"Aynı renkte olan ürün sayısı: {matching_color.sum()}")
+            # Her ürün için benzerlik skorunu hesapla
+            similarities = []
+            for idx in other_items.index:
+                similarity = self.calculate_similarity_score(user_item_idx, idx, user_cluster)
+                similarities.append(similarity)
+            
+            other_items['Similarity'] = similarities
             
             # Benzerlik dağılımını göster
-            similarity_stats = recommendations['Similarity'].describe()
+            similarity_stats = other_items['Similarity'].describe()
             print("\nBenzerlik skorları dağılımı:")
             print(similarity_stats)
             
-            # Minimum benzerlik skoru filtresi (artık daha düşük bir eşik)
-            MIN_SIMILARITY_THRESHOLD = 0.3  # Eşiği düşürdük
-            recommendations = recommendations[recommendations['Similarity'] >= MIN_SIMILARITY_THRESHOLD]
+            # Minimum benzerlik skoru filtresi
+            recommendations = other_items[other_items['Similarity'] >= MIN_SIMILARITY_THRESHOLD]
             print(f"\n{MIN_SIMILARITY_THRESHOLD} üzeri benzerlik skoruna sahip ürün sayısı: {len(recommendations)}")
             
             if len(recommendations) == 0:
                 print(f"\nUyarı: {MIN_SIMILARITY_THRESHOLD} benzerlik eşiği için yeterli öneri bulunamadı.")
                 return pd.DataFrame(), None
             
-            # Benzerliğe göre sırala
+            # Benzerliğe göre sırala ve önerileri seç
             recommendations = recommendations.sort_values('Similarity', ascending=False)
-            
-            # İstenen sayıda öneriyi seç
             recommendations = recommendations.head(n_recommendations)
             
             # Önerileri hazırla
