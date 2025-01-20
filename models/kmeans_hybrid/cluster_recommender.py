@@ -109,9 +109,9 @@ class ClusteringRecommender:
         
         # Ağırlıklar
         weights = {
-            'cluster': 0.31,      # Ürün kümesi benzerliği
+            'cluster': 0.26,      # Ürün kümesi benzerliği
             'category': 0.25,     # Kategori benzerliği
-            'season': 0.15,       # Sezon benzerliği
+            'season': 0.20,       # Sezon benzerliği
             'user_cluster': 0.19, # Kullanıcı kümesi benzerliği
             'price': 0.05,        # Fiyat benzerliği
             'color': 0.05         # Renk benzerliği
@@ -133,6 +133,11 @@ class ClusteringRecommender:
         # Final benzerlik skoru
         final_similarity = base_similarity * factor_similarity
         
+        """
+            base_similarity: İki ürünün temel sayısal özellikler üzerinden benzerliğini ölçer.
+            factor_similarity: Ürünlerin diğer kategorik özelliklerini ve fiyat gibi faktörleri değerlendirir.
+            final_similarity: Bu iki benzerlik metriğini birleştirerek nihai bir skor döndürür.
+        """
         return final_similarity
 
 

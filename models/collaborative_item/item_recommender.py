@@ -45,6 +45,7 @@ class ItemBasedRecommender:
             
             # Önerileri hazırla
             recommendations = []
+            
             for idx in similar_items_idx:
                 similar_item = self.item_df.iloc[idx]
                 # Ürünü alan kullanıcının bilgilerini al
